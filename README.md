@@ -1,0 +1,3 @@
+# Steps to Run Tests
+1. Run `dotnet user-jwts create --scope "weather" --role "{role}"` in the 'Euronext.Weather' project folder twice where `{role}` is 'weatherman' and 'reader' respectively.
+1. Run `dotnet user-secrets set "Weather:{role}ApiKey" "[token]"` in the 'Euronext.Weather.Tests' project folder where `{role}` is 'Weatherman' and 'Reader' respectively, and `[token]` is the token provided in the previous step respectively.
