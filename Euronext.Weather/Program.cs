@@ -32,6 +32,7 @@ app.MapPost("/weatherforecast", (WeatherForecastService weatherForecastService, 
 
 app.MapGet("/weekweatherforecast", (WeatherForecastService weatherForecastService, [FromQuery] DateOnly startDate) => weatherForecastService.GetWeekWeatherForecast(startDate))
     .RequireAuthorization(p => p.RequireRole("reader").RequireClaim("scope", "weather"))
+    .AddEndpointFilter(async (c, n) => c.GetArgument<DateOnly>(1) < DateOnly.FromDateTime(DateTime.Today) ? Results.Problem("Past dates not allowed!") : await n(c))
     .WithName("GetWeekWeatherForecast")
     .WithOpenApi();
 
