@@ -1,0 +1,10 @@
+﻿version: '3.8'
+
+services:
+  webapi:
+    build:      
+      context: ..
+      dockerfile: Euronext.Weather/Dockerfile
+    ports:
+      - "32770:80"
+      - "32773:443"
