@@ -1,10 +1,9 @@
-﻿using System.Resources;
-using Euronext.Weather.Data;
+﻿using Euronext.Weather.Data;
 using Euronext.Weather.Models;
 
 namespace Euronext.Weather.Services;
 
-public class ForecastService
+public sealed class ForecastService
 {
     private readonly ForecastContext _forecastDb;
 

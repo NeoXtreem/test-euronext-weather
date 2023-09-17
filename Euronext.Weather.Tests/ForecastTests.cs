@@ -9,7 +9,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace Euronext.Weather.Tests;
 
-public class ForecastTests
+public sealed class ForecastTests
 {
     private readonly Fixture _fixture = new();
     private readonly WeatherWebApplicationFactory _factory = new();
@@ -27,7 +27,7 @@ public class ForecastTests
     [InlineData(Population.Empty)]
     [InlineData(Population.Partial)]
     [InlineData(Population.Full)]
-    public async Task GivenForecastsAdded_WhenWeekForecastRequested_ShouldReturnWeekForecast(Population forecastsPopulation)
+    public async Task GivenZerOrMoreForecastsAdded_WhenWeekForecastRequested_ShouldReturnWeekForecast(Population forecastsPopulation)
     {
         // Arrange
         var partialWeekDaysLimitsGenerator = new RandomNumericSequenceGenerator(1, 6);
@@ -47,7 +47,7 @@ public class ForecastTests
         var startDate = DateOnly.FromDateTime(DateTime.Today).AddDays(_fixture.Create<int>());
 
         // Create some forecasts for the week (per the required days) ensuring the temperature is within the configured limits.
-        var forecastsConfig = _configuration.GetSection("Forecasts");
+        var forecastsConfig = _configuration.GetSection("Options");
         _fixture.Customizations.Add(new RandomNumericSequenceGenerator(forecastsConfig.GetValue<long>("MinTemperature"), forecastsConfig.GetValue<long>("MaxTemperature")));
         var weekForecasts = daysOfWeekToForecast.Select(d => new Forecast(startDate.AddDays(d), _fixture.Create<int>(), _fixture.Create<string>())).ToArray();
 
@@ -90,11 +90,44 @@ public class ForecastTests
     {
         // Arrange
         using var client = GetClient("Weatherman");
-        var dateLimitsGenerator = new RandomDateTimeSequenceGenerator(DateTime.MinValue, DateTime.Today.AddDays(-1));
-        _fixture.Customizations.Add(dateLimitsGenerator);
+        _fixture.Customizations.Add(new RandomDateTimeSequenceGenerator(DateTime.MinValue, DateTime.Today.AddDays(-1)));
 
         // Act
         var response = await client.PostAsJsonAsync("/forecast", _fixture.Create<Forecast>());
+
+        // Assert
+        var result = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal(GetResource("PastDatesErrorMessage"), result?.Detail);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GivenAnInvalidTemperature_WhenForecastAdded_ShouldReturnProblem(bool high)
+    {
+        // Arrange
+        using var client = GetClient("Weatherman");
+        var forecastsConfig = _configuration.GetSection("Options");
+        _fixture.Customizations.Add(new RandomNumericSequenceGenerator(high ? forecastsConfig.GetValue<long>("MinTemperature") : int.MinValue, high ? int.MaxValue : forecastsConfig.GetValue<long>("MaxTemperature")));
+        _fixture.Customizations.Add(new RandomDateTimeSequenceGenerator(DateTime.Today, DateTime.MaxValue));
+
+        // Act
+        var response = await client.PostAsJsonAsync("/forecast", _fixture.Create<Forecast>());
+
+        // Assert
+        var result = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal(GetResource("TemperatureOutOfRangeErrorMessage"), result?.Detail);
+    }
+
+    [Fact]
+    public async Task GivenAPastForecast_WhenWeekForecastRequested_ShouldReturnProblem()
+    {
+        // Arrange
+        using var client = GetClient("Reader");
+        _fixture.Customizations.Add(new RandomDateTimeSequenceGenerator(DateTime.MinValue, DateTime.Today.AddDays(-1)));
+
+        // Act
+        var response = await client.GetAsync($"/weekforecast/{_fixture.Create<DateOnly>():O}");
 
         // Assert
         var result = await response.Content.ReadFromJsonAsync<ProblemDetails>();

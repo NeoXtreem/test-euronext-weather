@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="..\Euronext.Weather\Resources\Services.MessageService.resx" Link="Resources\Services.MessageService.resx" />
+    <EmbeddedResource Include="..\Euronext.Weather\Resources\Services.LocalizerService.resx" Link="Resources\Services.LocalizerService.resx" />
   </ItemGroup>
 
   <ItemGroup>

@@ -120,4 +120,7 @@
   <data name="PastDatesErrorMessage" xml:space="preserve">
     <value>Past dates not allowed!</value>
   </data>
+  <data name="TemperatureOutOfRangeErrorMessage" xml:space="preserve">
+    <value>Temperature must be between {0} °C and {1} °C.</value>
+  </data>
 </root>

@@ -1,6 +1,6 @@
 ﻿namespace Euronext.Weather.Validation;
 
-public class DateOnlyValidation
+public sealed class DateOnlyValidation
 {
     public static bool IsTodayOrLater(DateOnly date) => date >= DateOnly.FromDateTime(DateTime.Today);
 }

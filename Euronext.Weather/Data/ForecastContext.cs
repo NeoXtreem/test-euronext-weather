@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Euronext.Weather.Data;
 
-public class ForecastContext : DbContext
+public sealed class ForecastContext : DbContext
 {
     public ForecastContext(DbContextOptions options) : base(options) { }
 

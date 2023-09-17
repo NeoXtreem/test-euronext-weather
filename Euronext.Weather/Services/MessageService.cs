@@ -2,11 +2,11 @@
 
 namespace Euronext.Weather.Services;
 
-public sealed class MessageService
+public static class LocalizerService
 {
-    private readonly IStringLocalizer<MessageService> _localizer;
+    public static IStringLocalizer Localizer { get; set; } = null!;
 
-    public MessageService(IStringLocalizer<MessageService> localizer) => _localizer = localizer;
+    public static string GetPastDatesErrorMessage() => Localizer["PastDatesErrorMessage"];
 
-    public string? GetPastDatesErrorMessage() => _localizer["PastDatesErrorMessage"];
+    internal static string? GetTemperatureOutOfRangeErrorMessage() => Localizer["TemperatureOutOfRangeErrorMessage"];
 }
