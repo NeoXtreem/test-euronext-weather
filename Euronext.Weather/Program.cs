@@ -1,6 +1,7 @@
 using Euronext.Weather.Data;
 using Euronext.Weather.Models;
 using Euronext.Weather.Services;
+using Euronext.Weather.Validation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,9 +11,14 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddAuthorization();
 builder.Services.AddAuthentication("Bearer").AddJwtBearer();
+builder.Services.AddLocalization(options =>
+{
+    options.ResourcesPath = "Resources";
+});
 
-builder.Services.AddDbContext<WeatherForecastContext>(options => options.UseInMemoryDatabase("weatherForecasts"));
-builder.Services.AddScoped<WeatherForecastService>();
+builder.Services.AddDbContext<ForecastContext>(options => options.UseInMemoryDatabase("forecasts"));
+builder.Services.AddScoped<MessageService>();
+builder.Services.AddScoped<ForecastService>();
 
 var app = builder.Build();
 
@@ -25,17 +31,18 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapPost("/weatherforecast", (WeatherForecastService weatherForecastService, WeatherForecast weatherForecast) => weatherForecastService.AddWeatherForecast(weatherForecast))
+app.MapPost("/forecast", (ForecastService forecastService, MessageService _, Forecast forecast) => forecastService.AddForecast(forecast))
     .RequireAuthorization(p => p.RequireRole("weatherman").RequireClaim("scope", "weather"))
-    .WithName("AddWeatherForecast")
+    .AddEndpointFilter(async (efiContext, next) => DateOnlyValidation.IsTodayOrLater(efiContext.GetArgument<Forecast>(2).Date) ? await next(efiContext) : Results.Problem(efiContext.GetArgument<MessageService>(1).GetPastDatesErrorMessage()))
+    .AddEndpointFilter(async (efiContext, next) => DateOnlyValidation.IsTodayOrLater(efiContext.GetArgument<Forecast>(2).Date) ? await next(efiContext) : Results.Problem(efiContext.GetArgument<MessageService>(1).GetPastDatesErrorMessage()))
+    .WithName("AddForecast")
     .WithOpenApi();
 
-app.MapGet("/weekweatherforecast", (WeatherForecastService weatherForecastService, [FromQuery] DateOnly startDate) => weatherForecastService.GetWeekWeatherForecast(startDate))
+app.MapGet("/weekforecast/{startDate}", (ForecastService forecastService, MessageService _, [FromRoute] DateOnly startDate) => forecastService.GetWeekForecast(startDate))
     .RequireAuthorization(p => p.RequireRole("reader").RequireClaim("scope", "weather"))
-    .AddEndpointFilter(async (c, n) => c.GetArgument<DateOnly>(1) < DateOnly.FromDateTime(DateTime.Today) ? Results.Problem("Past dates not allowed!") : await n(c))
-    .WithName("GetWeekWeatherForecast")
+    .AddEndpointFilter(async (efiContext, next) => DateOnlyValidation.IsTodayOrLater(efiContext.GetArgument<DateOnly>(2)) ? await next(efiContext) : Results.Problem(efiContext.GetArgument<MessageService>(1).GetPastDatesErrorMessage()))
+    .WithName("GetWeekForecast")
     .WithOpenApi();
-
 app.Run();
 
 public partial class Program { }

@@ -1,30 +1,33 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Reflection;
+using System.Resources;
 using AutoFixture;
 using Euronext.Weather.Models;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 
 namespace Euronext.Weather.Tests;
 
-public class WeatherForecastTests
+public class ForecastTests
 {
     private readonly Fixture _fixture = new();
     private readonly WeatherWebApplicationFactory _factory = new();
     private readonly IConfiguration _configuration = new ConfigurationBuilder()
-        .AddJsonFile($"appsettings.json")
-        .AddJsonFile($"appsettings.Development.json")
-        .AddUserSecrets<WeatherForecastTests>().Build();
+        .AddJsonFile("appsettings.json")
+        .AddJsonFile("appsettings.Development.json")
+        .AddUserSecrets<ForecastTests>().Build();
 
-    public WeatherForecastTests()
+    public ForecastTests()
     {
-        _fixture.Customize<DateOnly>(composer => composer.FromFactory<DateTime>(DateOnly.FromDateTime));
+        _fixture.Customize<DateOnly>(c => c.FromFactory<DateTime>(DateOnly.FromDateTime));
     }
 
     [Theory]
     [InlineData(Population.Empty)]
     [InlineData(Population.Partial)]
     [InlineData(Population.Full)]
-    public async Task GivenWeatherForecastsAdded_WhenWeekWeatherForecastRequested_ShouldReturnWeekWeatherForecast(Population forecastsPopulation)
+    public async Task GivenForecastsAdded_WhenWeekForecastRequested_ShouldReturnWeekForecast(Population forecastsPopulation)
     {
         // Arrange
         var partialWeekDaysLimitsGenerator = new RandomNumericSequenceGenerator(1, 6);
@@ -44,27 +47,27 @@ public class WeatherForecastTests
         var startDate = DateOnly.FromDateTime(DateTime.Today).AddDays(_fixture.Create<int>());
 
         // Create some forecasts for the week (per the required days) ensuring the temperature is within the configured limits.
-        var weatherForecastingConfig = _configuration.GetSection("WeatherForecasting");
-        _fixture.Customizations.Add(new RandomNumericSequenceGenerator(weatherForecastingConfig.GetValue<long>("MinTemperature"), weatherForecastingConfig.GetValue<long>("MaxTemperature")));
-        var weekForecasts = daysOfWeekToForecast.Select(d => new WeatherForecast(startDate.AddDays(d), _fixture.Create<int>(), _fixture.Create<string>())).ToArray();
+        var forecastsConfig = _configuration.GetSection("Forecasts");
+        _fixture.Customizations.Add(new RandomNumericSequenceGenerator(forecastsConfig.GetValue<long>("MinTemperature"), forecastsConfig.GetValue<long>("MaxTemperature")));
+        var weekForecasts = daysOfWeekToForecast.Select(d => new Forecast(startDate.AddDays(d), _fixture.Create<int>(), _fixture.Create<string>())).ToArray();
 
         using (var client = GetClient("Weatherman"))
         {
             var totalForecasts = weekForecasts.ToList();
 
             // Add some forecasts before and after the week that the user will request.
-            foreach (var (min, max) in new (DateOnly Min, DateOnly Max) [] { (DateOnly.MinValue, startDate.AddDays(-1)), (startDate.AddDays(8), DateOnly.MaxValue) })
+            foreach (var (min, max) in new (DateOnly Min, DateOnly Max) [] { (DateOnly.FromDateTime(DateTime.Today), startDate.AddDays(-1)), (startDate.AddDays(8), DateOnly.MaxValue) })
             {
                 var dateLimitsGenerator = new RandomDateTimeSequenceGenerator(min.ToDateTime(TimeOnly.MinValue), max.ToDateTime(TimeOnly.MinValue));
                 _fixture.Customizations.Add(dateLimitsGenerator);
-                totalForecasts.AddRange(_fixture.CreateMany<WeatherForecast>());
+                totalForecasts.AddRange(_fixture.CreateMany<Forecast>().DistinctBy(x => x.Date));
                 _fixture.Customizations.Remove(dateLimitsGenerator);
             }
 
             // Add all the forecasts to the weather service.
             foreach (var forecast in totalForecasts)
             {
-                var response = await client.PostAsJsonAsync("/weatherforecast", forecast);
+                var response = await client.PostAsJsonAsync("/forecast", forecast);
                 response.EnsureSuccessStatusCode();
             }
         }
@@ -72,14 +75,30 @@ public class WeatherForecastTests
         using (var client = GetClient("Reader"))
         {
             // Act
-            var response = await client.GetAsync($"/weekweatherforecast?startDate={startDate:O}");
+            var response = await client.GetAsync($"/weekforecast/{startDate:O}");
 
             // Assert
             response.EnsureSuccessStatusCode();
-            var result = await response.Content.ReadFromJsonAsync<WeatherForecast[]>();
+            var result = await response.Content.ReadFromJsonAsync<Forecast[]>();
 
             Assert.Equivalent(weekForecasts, result);
         }
+    }
+
+    [Fact]
+    public async Task GivenAPastForecast_WhenForecastAdded_ShouldReturnProblem()
+    {
+        // Arrange
+        using var client = GetClient("Weatherman");
+        var dateLimitsGenerator = new RandomDateTimeSequenceGenerator(DateTime.MinValue, DateTime.Today.AddDays(-1));
+        _fixture.Customizations.Add(dateLimitsGenerator);
+
+        // Act
+        var response = await client.PostAsJsonAsync("/forecast", _fixture.Create<Forecast>());
+
+        // Assert
+        var result = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal(GetResource("PastDatesErrorMessage"), result?.Detail);
     }
 
     private HttpClient GetClient(string apiKeyName)
@@ -87,6 +106,15 @@ public class WeatherForecastTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _configuration[$"Weather:{apiKeyName}ApiKey"]);
         return client;
+    }
+
+    private static string GetResource(string name)
+    {
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(Assembly.GetExecutingAssembly().GetManifestResourceNames().Single());
+        using var resourceReader = new ResourceReader(stream!);
+        resourceReader.GetResourceData(name, out _, out var data);
+        using var reader = new BinaryReader(new MemoryStream(data));
+        return reader.ReadString();
     }
 
     public enum Population

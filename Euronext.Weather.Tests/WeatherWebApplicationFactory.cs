@@ -14,8 +14,8 @@ public class WeatherWebApplicationFactory : WebApplicationFactory<Program>
     {
         builder.ConfigureServices(services =>
         {
-            services.Remove(services.Single(d => d.ServiceType == typeof(DbContextOptions<WeatherForecastContext>)));
-            services.AddDbContext<WeatherForecastContext>(options => options.UseInMemoryDatabase(_databaseName));
+            services.Remove(services.Single(d => d.ServiceType == typeof(DbContextOptions<ForecastContext>)));
+            services.AddDbContext<ForecastContext>(options => options.UseInMemoryDatabase(_databaseName));
         });
 
         builder.UseEnvironment("Development");
