@@ -103,7 +103,7 @@ public sealed class ForecastTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task GivenAnInvalidTemperature_WhenForecastAdded_ShouldReturnProblem(bool high)
+    public async Task GivenAnInvalidTemperature_WhenForecastAdded_ShouldReturnError(bool high)
     {
         // Arrange
         using var client = GetClient("Weatherman");
@@ -115,8 +115,9 @@ public sealed class ForecastTests
         var response = await client.PostAsJsonAsync("/forecast", _fixture.Create<Forecast>());
 
         // Assert
-        var result = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal(GetResource("TemperatureOutOfRangeErrorMessage"), result?.Detail);
+        var result = await response.Content.ReadAsStringAsync();
+        var options = _configuration.GetSection("Options");
+        Assert.Contains(string.Format(GetResource("TemperatureOutOfRangeErrorMessage"), options.GetValue<int>("MinTemperature"), options.GetValue<int>("MaxTemperature")), result);
     }
 
     [Fact]

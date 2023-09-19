@@ -8,5 +8,5 @@ public static class LocalizerService
 
     public static string GetPastDatesErrorMessage() => Localizer["PastDatesErrorMessage"];
 
-    internal static string? GetTemperatureOutOfRangeErrorMessage() => Localizer["TemperatureOutOfRangeErrorMessage"];
+    internal static string GetTemperatureOutOfRangeErrorMessage() => Localizer["TemperatureOutOfRangeErrorMessage"];
 }

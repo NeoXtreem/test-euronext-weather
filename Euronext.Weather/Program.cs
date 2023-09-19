@@ -27,8 +27,6 @@ using (var serviceScope = app.Services.CreateScope())
     LocalizerService.Localizer = serviceScope.ServiceProvider.GetRequiredService<IStringLocalizerFactory>().Create(typeof(LocalizerService));
 }
 
-var options = builder.Configuration.GetSection("Options");
-
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -41,13 +39,6 @@ app.UseHttpsRedirection();
 app.MapPost("/forecast", (ForecastService forecastService, Forecast forecast) => forecastService.AddForecast(forecast))
     .RequireAuthorization(p => p.RequireRole("weatherman").RequireClaim("scope", "weather"))
     .AddEndpointFilter(async (efiContext, next) => DateOnlyValidation.IsTodayOrLater(efiContext.GetArgument<Forecast>(1).Date) ? await next(efiContext) : Results.Problem(LocalizerService.GetPastDatesErrorMessage()))
-    .AddEndpointFilter(async (efiContext, next) =>
-    {
-        var temperatureC = efiContext.GetArgument<Forecast>(1).TemperatureC;
-        return temperatureC < options.GetValue<int>("MinTemperature") || temperatureC > options.GetValue<int>("MaxTemperature")
-            ? Results.Problem(LocalizerService.GetTemperatureOutOfRangeErrorMessage())
-            : await next(efiContext);
-    })
     .WithName("AddForecast")
     .WithOpenApi();
 
