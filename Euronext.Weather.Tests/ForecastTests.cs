@@ -27,7 +27,7 @@ public sealed class ForecastTests
     [InlineData(Population.Empty)]
     [InlineData(Population.Partial)]
     [InlineData(Population.Full)]
-    public async Task GivenZerOrMoreForecastsAdded_WhenWeekForecastRequested_ShouldReturnWeekForecast(Population forecastsPopulation)
+    public async Task GivenZeroOrMoreForecastsAdded_WhenWeekForecastRequested_ShouldReturnWeekForecast(Population forecastsPopulation)
     {
         // Arrange
         var partialWeekDaysLimitsGenerator = new RandomNumericSequenceGenerator(1, 6);
@@ -90,6 +90,8 @@ public sealed class ForecastTests
     {
         // Arrange
         using var client = GetClient("Weatherman");
+        var forecastsConfig = _configuration.GetSection("Options");
+        _fixture.Customizations.Add(new RandomNumericSequenceGenerator(forecastsConfig.GetValue<long>("MinTemperature"), forecastsConfig.GetValue<long>("MaxTemperature")));
         _fixture.Customizations.Add(new RandomDateTimeSequenceGenerator(DateTime.MinValue, DateTime.Today.AddDays(-1)));
 
         // Act
@@ -103,7 +105,7 @@ public sealed class ForecastTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task GivenAnInvalidTemperature_WhenForecastAdded_ShouldReturnError(bool high)
+    public void GivenAnInvalidTemperature_WhenForecastAdded_ShouldReturnError(bool high)
     {
         // Arrange
         using var client = GetClient("Weatherman");
@@ -112,12 +114,11 @@ public sealed class ForecastTests
         _fixture.Customizations.Add(new RandomDateTimeSequenceGenerator(DateTime.Today, DateTime.MaxValue));
 
         // Act
-        var response = await client.PostAsJsonAsync("/forecast", _fixture.Create<Forecast>());
+        var result = Assert.Throws<ArgumentOutOfRangeException>(() => new Forecast(_fixture.Create<DateOnly>(), _fixture.Create<int>(), _fixture.Create<string>()));
 
         // Assert
-        var result = await response.Content.ReadAsStringAsync();
         var options = _configuration.GetSection("Options");
-        Assert.Contains(string.Format(GetResource("TemperatureOutOfRangeErrorMessage"), options.GetValue<int>("MinTemperature"), options.GetValue<int>("MaxTemperature")), result);
+        Assert.Contains(string.Format(GetResource("TemperatureOutOfRangeErrorMessage"), options.GetValue<int>("MinTemperature"), options.GetValue<int>("MaxTemperature")), result.Message);
     }
 
     [Fact]
