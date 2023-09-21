@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Euronext.Weather.Tests;
 
-public sealed class WeatherWebApplicationFactory : WebApplicationFactory<Program>
+internal sealed class WeatherWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = Guid.NewGuid().ToString();
 

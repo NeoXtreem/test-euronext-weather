@@ -3,7 +3,7 @@ using Euronext.Weather.Models;
 
 namespace Euronext.Weather.Services;
 
-public sealed class ForecastService
+internal sealed class ForecastService
 {
     private readonly ForecastContext _forecastDb;
 
